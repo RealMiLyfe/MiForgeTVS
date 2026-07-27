@@ -509,7 +509,7 @@ export const workflowsData: WorkflowData[] = [
 export const servicesData: ServiceData[] = [
   { name: "Ollama", port: 11434, category: "LLM", description: "Local LLM serving" },
   { name: "OpenWebUI", port: 3000, category: "UI", description: "Primary LLM interface" },
-  { name: "AnythingLLM", port: 3001, category: "RAG", description: "RAG and knowledge management" },
+  { name: "AnythingLLM", port: 3022, category: "RAG", description: "RAG and knowledge management" },
   { name: "Metabase", port: 3002, category: "UI", description: "Business intelligence dashboard" },
   { name: "Grafana", port: 3003, category: "Monitoring", description: "System monitoring" },
   { name: "Langfuse", port: 3004, category: "Observability", description: "Agent observability" },
@@ -524,6 +524,7 @@ export const servicesData: ServiceData[] = [
   { name: "MLflow", port: 5000, category: "Learning", description: "Experiment tracking" },
   { name: "Gotify", port: 8070, category: "Notifications", description: "Push notifications" },
   { name: "Keycloak", port: 8443, category: "Security", description: "SSO authentication" },
+  { name: "Akaunting", port: 8081, category: "ERP", description: "Accounting and invoicing backend" },
 ];
 
 export const channelsData: ChannelData[] = [

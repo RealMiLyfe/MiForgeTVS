@@ -153,6 +153,117 @@ def post_to_mattermost(bot_username: str, message: str, channel_name: str = None
         print(f"[ERROR] Failed to post as {bot_username}: {e}")
         return False
 
+# ============================================================
+# AKAUNTING INTEGRATION
+# ============================================================
+
+AKAUNTING_URL = "http://localhost:8081"
+AKAUNTING_TOKEN = None
+
+def akaunting_get_token():
+    """Authenticate with Akaunting API and store the token."""
+    global AKAUNTING_TOKEN
+    try:
+        response = requests.post(
+            f"{AKAUNTING_URL}/api/v1/auth/login",
+            json={
+                "email": os.getenv("AKAUNTING_EMAIL"),
+                "password": os.getenv("AKAUNTING_PASSWORD")
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            AKAUNTING_TOKEN = response.json().get("token")
+            return True
+        else:
+            print(f"[ERROR] Failed to authenticate with Akaunting: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Akaunting authentication error: {e}")
+        return False
+
+def akaunting_check_vendor(vendor_name):
+    """Search for a vendor in Akaunting."""
+    try:
+        response = requests.get(
+            f"{AKAUNTING_URL}/api/v1/vendors",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}"
+            },
+            params={"search": vendor_name},
+            timeout=10
+        )
+        if response.status_code == 200:
+            vendors = response.json().get("data", [])
+            return vendors[0] if vendors else None
+        else:
+            print(f"[ERROR] Failed to check vendor in Akaunting: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Akaunting vendor check error: {e}")
+        return None
+
+def akaunting_create_vendor(vendor_data):
+    """Create a new vendor in Akaunting."""
+    try:
+        response = requests.post(
+            f"{AKAUNTING_URL}/api/v1/vendors",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}",
+                "Content-Type": "application/json"
+            },
+            json=vendor_data,
+            timeout=10
+        )
+        if response.status_code == 201:
+            return response.json().get("data")
+        else:
+            print(f"[ERROR] Failed to create vendor in Akaunting: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Akaunting vendor creation error: {e}")
+        return None
+
+def akaunting_create_invoice(invoice_data):
+    """Create a new invoice (bill) in Akaunting."""
+    try:
+        response = requests.post(
+            f"{AKAUNTING_URL}/api/v1/bills",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}",
+                "Content-Type": "application/json"
+            },
+            json=invoice_data,
+            timeout=10
+        )
+        if response.status_code == 201:
+            return response.json().get("data")
+        else:
+            print(f"[ERROR] Failed to create invoice in Akaunting: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Akaunting invoice creation error: {e}")
+        return None
+
+def akaunting_get_invoices():
+    """List recent invoices from Akaunting."""
+    try:
+        response = requests.get(
+            f"{AKAUNTING_URL}/api/v1/bills",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}"
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            return response.json().get("data", [])
+        else:
+            print(f"[ERROR] Failed to get invoices from Akaunting: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"[ERROR] Akaunting invoice retrieval error: {e}")
+        return []
+
 def ask_ollama(model: str, prompt: str, system: str = "") -> str:
     """Ask a question to a local Ollama model."""
     try:
@@ -257,7 +368,49 @@ def watch_incoming_files():
                             "You are Calvin, the AR Lead for MiLyfe: Venture Titan Studio. You handle invoices, receipts, and financial documents. You are methodical and flag anything over $500 for human review."
                         )
                         
-                        message = f"📥 **New Document Received**\n\n**File:** `{file_path.name}`\n**Detected:** {datetime.now().strftime('%H:%M:%S')}\n\n{analysis}\n\n_Processing initiated. Human review required if amount exceeds $500._"
+                        try:
+                            with open(file_path, 'r') as file:
+                                content = file.read()
+                            
+                            # Extract vendor name, amount, date, description
+                            import re
+                            vendor_match = re.search(r'Vendor:\s*(.*)', content)
+                            amount_match = re.search(r'Amount:\s*([\d,.]+)', content)
+                            date_match = re.search(r'Date:\s*(.*)', content)
+                            desc_match = re.search(r'Description:\s*(.*)', content)
+                            
+                            vendor_name = vendor_match.group(1) if vendor_match else "Unknown"
+                            amount = float(amount_match.group(1).replace(',', '')) if amount_match else 0.0
+                            date = date_match.group(1) if date_match else datetime.now().strftime('%Y-%m-%d')
+                            description = desc_match.group(1) if desc_match else "No description provided"
+                            
+                            vendor = akaunting_check_vendor(vendor_name)
+                            if vendor:
+                                invoice_data = {
+                                    "vendor_id": vendor["id"],
+                                    "amount": amount,
+                                    "date": date,
+                                    "description": description
+                                }
+                                akaunting_create_invoice(invoice_data)
+                            else:
+                                post_to_mattermost("calvin-ar", f"Vendor not found: {vendor_name}", "human-approvals")
+                            
+                            if amount > 500:
+                                post_to_mattermost("calvin-ar", f"Amount exceeds $500: ${amount}", "human-approvals")
+                            
+                        except Exception as e:
+                            print(f"[ERROR] File reading error: {e}")
+                        
+                        message = (f"📥 **New Document Received**\n\n"
+                                   f"**File:** `{file_path.name}`\n"
+                                   f"**Detected:** {datetime.now().strftime('%H:%M:%S')}\n"
+                                   f"**Vendor:** {vendor_name}\n"
+                                   f"**Amount:** ${amount}\n"
+                                   f"**Date:** {date}\n"
+                                   f"**Description:** {description}\n\n"
+                                   f"{analysis}\n\n"
+                                   f"_Processing initiated. Human review required if amount exceeds $500._")
                         post_to_mattermost("calvin-ar", message)
                         log_to_dashboard(f"Calvin processing new file: {file_path.name}", "info", "calvin-ar")
         
@@ -288,6 +441,43 @@ def weekly_retrospective():
         )
     
     log_to_dashboard("Weekly retrospective posted by Leo", "info", "leo-learning")
+
+# ============================================================
+# WORKFLOW 5: DAILY INVOICE REPORT (Frank — Daily)
+# ============================================================
+
+def daily_invoice_report():
+    """Frank generates a daily invoice report."""
+    print(f"[{datetime.now()}] Frank generating daily invoice report...")
+    
+    invoices = akaunting_get_invoices()
+    if not invoices:
+        post_to_mattermost("frank-finance", "📅 **Daily Invoice Report**\n\nNo invoices found today.", "finance-desk")
+        return
+    
+    total_amount = sum(invoice["amount"] for invoice in invoices)
+    vendor_counts = {}
+    
+    for invoice in invoices:
+        vendor_name = akaunting_check_vendor(invoice["vendor_id"])["name"]
+        if vendor_name in vendor_counts:
+            vendor_counts[vendor_name] += 1
+        else:
+            vendor_counts[vendor_name] = 1
+    
+    report = (f"📅 **Daily Invoice Report — {datetime.now().strftime('%B %d, %Y')}**\n\n"
+              f"**Total Invoices:** {len(invoices)}\n"
+              f"**Total Amount:** ${total_amount:.2f}\n"
+              f"**Vendors:**\n")
+    
+    for vendor, count in vendor_counts.items():
+        report += f"- {vendor}: {count} invoices\n"
+    
+    post_to_mattermost("frank-finance", report, "finance-desk")
+    log_to_dashboard("Daily invoice report posted by Frank", "info", "frank-finance")
+
+# Schedule daily invoice report
+schedule.every().day.at("18:00").do(daily_invoice_report)
 
 # ============================================================
 # AGENT ONLINE ANNOUNCEMENTS

@@ -20,6 +20,7 @@ const serviceEndpoints: Record<string, string> = {
   "Argilla": "http://localhost:6900",
   "MLflow": "http://localhost:5000",
   "Gotify": "http://localhost:8070",
+  "Akaunting": "http://localhost:8081",
 };
 
 export async function GET() {
