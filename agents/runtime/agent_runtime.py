@@ -12,6 +12,7 @@ import schedule
 import threading
 from datetime import datetime
 from pathlib import Path
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv('/home/milyfe/Desktop/TVS/.env')
@@ -119,6 +120,17 @@ AGENTS = {
         "emoji": "🧠"
     }
 }
+
+def record_to_hledger(invoice_data):
+    """Record invoice data to hledger."""
+    try:
+        subprocess.run(["hledger", "add", "-T", f"{invoice_data['date']}", 
+                        "--payee", f"{invoice_data['vendor_name']}",
+                        "--amount", f"-{invoice_data['amount']:.2f}"],
+                       check=True)
+        print(f"[INFO] Invoice recorded to hledger: {invoice_data}")
+    except Exception as e:
+        print(f"[ERROR] Failed to record invoice to hledger: {e}")
 
 # ============================================================
 # CORE FUNCTIONS
@@ -287,6 +299,9 @@ def ask_ollama(model: str, prompt: str, system: str = "") -> str:
         print(f"[ERROR] Ollama error with {model}: {e}")
         return ""
 
+from pathlib import Path
+import subprocess
+
 def log_to_dashboard(message: str, severity: str = "info", source: str = "runtime"):
     """Log a message to the MiLyfe dashboard."""
     try:
@@ -392,7 +407,13 @@ def watch_incoming_files():
                                     "date": date,
                                     "description": description
                                 }
-                                akaunting_create_invoice(invoice_data)
+                                created_invoice = akaunting_create_invoice(invoice_data)
+                                if created_invoice:
+                                    record_to_hledger({
+                                        'date': date,
+                                        'vendor_name': vendor_name,
+                                        'amount': amount
+                                    })
                             else:
                                 post_to_mattermost("calvin-ar", f"Vendor not found: {vendor_name}", "human-approvals")
                             
@@ -472,7 +493,17 @@ def daily_invoice_report():
     
     for vendor, count in vendor_counts.items():
         report += f"- {vendor}: {count} invoices\n"
-    
+
+    # Add hledger balance command
+    try:
+        result = subprocess.run(["hledger", "balance"], capture_output=True, text=True)
+        if result.returncode == 0:
+            report += "\n**Hledger Balance:**\n" + result.stdout
+        else:
+            print(f"[ERROR] Failed to get hledger balance: {result.stderr}")
+    except Exception as e:
+        print(f"[ERROR] Hledger command error: {e}")
+
     post_to_mattermost("frank-finance", report, "finance-desk")
     log_to_dashboard("Daily invoice report posted by Frank", "info", "frank-finance")
 
