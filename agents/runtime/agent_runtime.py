@@ -399,24 +399,12 @@ def watch_incoming_files():
                             date = date_match.group(1) if date_match else datetime.now().strftime('%Y-%m-%d')
                             description = desc_match.group(1) if desc_match else "No description provided"
                             
-                            vendor = akaunting_check_vendor(vendor_name)
-                            if vendor:
-                                invoice_data = {
-                                    "vendor_id": vendor["id"],
-                                    "amount": amount,
-                                    "date": date,
-                                    "description": description
-                                }
-                                created_invoice = akaunting_create_invoice(invoice_data)
-                                if created_invoice:
-                                    record_to_hledger({
-                                        'date': date,
-                                        'vendor_name': vendor_name,
-                                        'amount': amount
-                                    })
-                            else:
-                                post_to_mattermost("calvin-ar", f"Vendor not found: {vendor_name}", "human-approvals")
-                            
+                            record_to_hledger({
+                                'date': date,
+                                'vendor_name': vendor_name,
+                                'amount': amount
+                            })
+                        
                             if amount > 500:
                                 post_to_mattermost("calvin-ar", f"Amount exceeds $500: ${amount}", "human-approvals")
                             
