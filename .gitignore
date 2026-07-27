@@ -1,2 +1,4 @@
 .aider*
 .env
+.next/
+nohup.out
