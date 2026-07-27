@@ -6,14 +6,15 @@ All 11 agents running on local Ollama models
 
 import json
 import os
+import sys
 import time
 import requests
 import schedule
 import threading
 from datetime import datetime
 from pathlib import Path
-from pathlib import Path
 from dotenv import load_dotenv
+from agents.payments.gocardless_handler import create_payment_with_gocardless
 
 load_dotenv('/home/milyfe/Desktop/TVS/.env')
 
@@ -37,7 +38,6 @@ def load_secrets():
 
 TOKENS, CHANNELS = load_secrets()
 
-
 def get_client_for_file(file_path: str) -> str:
     """Infer client from path or filename, else default."""
     p = str(file_path).lower()
@@ -46,7 +46,6 @@ def get_client_for_file(file_path: str) -> str:
     if "ohio" in p:
         return "ohio-landscaping"
     return "default"
-
 
 # ============================================================
 # AGENT DEFINITIONS
@@ -401,13 +400,16 @@ def watch_incoming_files():
                         print(f"[Calvin] New file detected: {file_path.name}")
                         
                         # Calvin processes the file
-                        analysis = ask_ollama(
-                            "qwen2.5:14b",
-                            f"A new file named '{file_path.name}' has arrived in the incoming folder. Based on the filename, classify this document type and describe what initial processing steps should be taken. Keep response under 3 sentences.",
-                            "You are Calvin, the AR Lead for MiLyfe: Venture Titan Studio. You handle invoices, receipts, and financial documents. You are methodical and flag anything over $500 for human review."
-                        )
-                        
-                        try:
+                        suffix = Path(file_path).suffix.lower()
+                        if suffix == ".pdf" or suffix in [".jpg", ".png", ".jpeg"]:
+                            result = subprocess.run([sys.executable, 'agents/ocr/iris_processor.py', str(file_path)], capture_output=True, text=True)
+                            parsed = json.loads(result.stdout) if result.returncode == 0 and "error" not in result.stdout else {}
+                            
+                            vendor_name = parsed.get("vendor_name", "Unknown")
+                            amount = float(parsed.get("amount", 0))
+                            date = parsed.get("date", datetime.now().strftime("%Y-%m-%d"))
+                            description = parsed.get("description", "No description provided")
+                        elif suffix == ".txt":
                             with open(file_path, 'r') as file:
                                 content = file.read()
                             
@@ -422,20 +424,26 @@ def watch_incoming_files():
                             amount = float(amount_match.group(2).replace(",", "")) if amount_match else 0.0
                             date = date_match.group(2).strip() if date_match else datetime.now().strftime("%Y-%m-%d")
                             description = desc_match.group(2).strip() if desc_match else "No description provided"
-                            
-                            client_name = get_client_for_file(str(file_path))
-                            record_to_hledger({
-                                'date': date,
-                                'vendor_name': vendor_name,
-                                'amount': amount,
-                                'client_name': client_name
-                            })
+                        else:
+                            print(f"[ERROR] Unsupported file type: {suffix}")
+                            continue
                         
-                            if amount > 500:
-                                post_to_mattermost("calvin-ar", f"Amount exceeds $500: ${amount}", "human-approvals")
-                            
-                        except Exception as e:
-                            print(f"[ERROR] File reading error: {e}")
+                        client_name = get_client_for_file(str(file_path))
+                        record_to_hledger({
+                            'date': date,
+                            'vendor_name': vendor_name,
+                            'amount': amount,
+                            'client_name': client_name
+                        })
+                        
+                        if 0 < amount < 500:
+                            payment_id = create_payment_with_gocardless(vendor_name, int(amount * 100), description)
+                            if payment_id:
+                                post_to_mattermost("calvin-ar", f"Payment of ${amount} processed via GoCardless. Payment ID: {payment_id}", "finance-desk")
+                            else:
+                                post_to_mattermost("calvin-ar", f"GoCardless payment failed for vendor - flagging for manual review", "finance-desk")
+                        elif amount >= 500:
+                            post_to_mattermost("calvin-ar", f"APPROVAL REQUIRED - Invoice from {vendor_name} for ${amount}", "human-approvals")
                         
                         message = (f"📥 **New Document Received**\n\n"
                                    f"**File:** `{file_path.name}`\n"
@@ -444,7 +452,6 @@ def watch_incoming_files():
                                    f"**Amount:** ${amount}\n"
                                    f"**Date:** {date}\n"
                                    f"**Description:** {description}\n\n"
-                                   f"{analysis}\n\n"
                                    f"_Processing initiated. Human review required if amount exceeds $500._")
                         post_to_mattermost("calvin-ar", message)
                         log_to_dashboard(f"Calvin processing new file: {file_path.name}", "info", "calvin-ar")
@@ -625,4 +632,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

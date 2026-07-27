@@ -11,19 +11,27 @@ def extract_text_from_txt(file_path: str) -> str:
         return f.read()
 
 def extract_text_from_pdf(file_path: str) -> str:
-    import pdfplumber
-    text = []
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            page_text = page.extract_text() or ""
-            text.append(page_text)
-    return "\n".join(text)
+    try:
+        import pdfplumber
+        text = []
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text() or ""
+                text.append(page_text)
+        return "\n".join(text)
+    except ImportError:
+        print(json.dumps({"error": "pdfplumber is not installed"}), file=sys.stderr)
+        sys.exit(1)
 
 def extract_text_from_image(file_path: str) -> str:
-    from PIL import Image
-    import pytesseract
-    img = Image.open(file_path)
-    return pytesseract.image_to_string(img)
+    try:
+        from PIL import Image
+        import pytesseract
+        img = Image.open(file_path)
+        return pytesseract.image_to_string(img)
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        sys.exit(1)
 
 def extract_fields(text: str) -> dict:
     vendor_patterns = [
@@ -79,7 +87,7 @@ def main():
             text = extract_text_from_txt(file_path)
         elif suffix == ".pdf":
             text = extract_text_from_pdf(file_path)
-        elif suffix in [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"]:
+        elif suffix in [".png", ".jpg", ".jpeg"]:
             text = extract_text_from_image(file_path)
         else:
             print(json.dumps({"error": f"Unsupported file type: {suffix}"}))
@@ -88,7 +96,7 @@ def main():
         result = extract_fields(text)
         print(json.dumps(result))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
