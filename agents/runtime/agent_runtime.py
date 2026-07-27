@@ -37,6 +37,17 @@ def load_secrets():
 
 TOKENS, CHANNELS = load_secrets()
 
+
+def get_client_for_file(file_path: str) -> str:
+    """Infer client from path or filename, else default."""
+    p = str(file_path).lower()
+    if "teresa" in p:
+        return "teresa-grooming"
+    if "ohio" in p:
+        return "ohio-landscaping"
+    return "default"
+
+
 # ============================================================
 # AGENT DEFINITIONS
 # ============================================================
@@ -122,13 +133,26 @@ AGENTS = {
 }
 
 def record_to_hledger(invoice_data):
-    """Record invoice data to hledger."""
+    """Record invoice data to hledger by appending to journal file."""
     try:
-        subprocess.run(["hledger", "add", "-T", f"{invoice_data['date']}", 
-                        "--payee", f"{invoice_data['vendor_name']}",
-                        "--amount", f"-{invoice_data['amount']:.2f}"],
-                       check=True)
-        print(f"[INFO] Invoice recorded to hledger: {invoice_data}")
+        from pathlib import Path
+        client_name = invoice_data.get("client_name", "default")
+        journal_path = Path(f"/opt/milyfe/clients/{client_name}/ledger/{client_name}.journal")
+        journal_path.parent.mkdir(parents=True, exist_ok=True)
+        if not journal_path.exists():
+            journal_path.write_text(f"; {client_name} Ledger\n\n")
+        date = invoice_data.get("date", datetime.now().strftime("%Y-%m-%d"))
+        vendor = invoice_data.get("vendor_name", "Unknown")
+        amount = float(invoice_data.get("amount", 0))
+        entry = f"""
+{date} {vendor}
+    expenses:vendors    ${amount:.2f}
+    assets:checking
+
+"""
+        with open(journal_path, "a") as f:
+            f.write(entry)
+        print(f"[INFO] Invoice recorded to hledger: {vendor} ${amount:.2f}")
     except Exception as e:
         print(f"[ERROR] Failed to record invoice to hledger: {e}")
 
@@ -389,20 +413,22 @@ def watch_incoming_files():
                             
                             # Extract vendor name, amount, date, description
                             import re
-                            vendor_match = re.search(r'Vendor:\s*(.*)', content)
-                            amount_match = re.search(r'Amount:\s*([\d,.]+)', content)
-                            date_match = re.search(r'Date:\s*(.*)', content)
-                            desc_match = re.search(r'Description:\s*(.*)', content)
+                            vendor_match = re.search(r"(?im)^\s*(vendor|from|supplier)\s*:\s*(.+)$", content)
+                            amount_match = re.search(r"(?im)^\s*(amount|total|total due|subtotal)\s*:\s*\$?\s*([0-9][0-9,]*\.?[0-9]*)$", content)
+                            date_match = re.search(r"(?im)^\s*(date|invoice date)\s*:\s*(.+)$", content)
+                            desc_match = re.search(r"(?im)^\s*(description|item|items)\s*:\s*(.+)$", content)
                             
-                            vendor_name = vendor_match.group(1) if vendor_match else "Unknown"
-                            amount = float(amount_match.group(1).replace(',', '')) if amount_match else 0.0
-                            date = date_match.group(1) if date_match else datetime.now().strftime('%Y-%m-%d')
-                            description = desc_match.group(1) if desc_match else "No description provided"
+                            vendor_name = vendor_match.group(2).strip() if vendor_match else "Unknown"
+                            amount = float(amount_match.group(2).replace(",", "")) if amount_match else 0.0
+                            date = date_match.group(2).strip() if date_match else datetime.now().strftime("%Y-%m-%d")
+                            description = desc_match.group(2).strip() if desc_match else "No description provided"
                             
+                            client_name = get_client_for_file(str(file_path))
                             record_to_hledger({
                                 'date': date,
                                 'vendor_name': vendor_name,
-                                'amount': amount
+                                'amount': amount,
+                                'client_name': client_name
                             })
                         
                             if amount > 500:
@@ -462,48 +488,56 @@ def daily_invoice_report():
     try:
         client_ledgers = list(Path("/opt/milyfe/clients").glob("*/ledger/*.journal"))
         if not client_ledgers:
-            post_to_mattermost("frank-finance", "📅 **Daily Finance Report**
-
-No client ledgers found.", "finance-desk")
+            post_to_mattermost(
+                "frank-finance",
+                "Daily Finance Report - No client ledgers found.",
+                "finance-desk"
+            )
             return
 
-        report_lines = [f"📅 **Daily Finance Report — {datetime.now().strftime('%B %d, %Y')}**
-"]
+        report_lines = [
+            f"📅 **Daily Finance Report — {datetime.now().strftime('%B %d, %Y')}**",
+            ""
+        ]
+
         for ledger in client_ledgers:
             client_name = ledger.stem
+
             balance = subprocess.run(
-                ["hledger", "-f", str(ledger), "balance"],
+                ["", "-f", str(ledger), "balance"],
                 capture_output=True,
                 text=True
             )
+
             register = subprocess.run(
-                ["hledger", "-f", str(ledger), "register"],
+                ["", "-f", str(ledger), "register"],
                 capture_output=True,
                 text=True
             )
 
             report_lines.append(f"**Client:** {client_name}")
+
             if balance.returncode == 0:
                 report_lines.append("**Balance:**")
-                report_lines.append(f"```
-{balance.stdout.strip()}
-```")
+                report_lines.append(f"```\n{balance.stdout.strip()}\n```")
             else:
                 report_lines.append(f"Balance error: {balance.stderr.strip()}")
 
             if register.returncode == 0 and register.stdout.strip():
                 report_lines.append("**Recent Transactions:**")
-                report_lines.append(f"```
-{register.stdout.strip()[:1500]}
-```")
+                report_lines.append(f"```\n{register.stdout.strip()[:1500]}\n```")
             else:
                 report_lines.append("No recent transactions.")
 
             report_lines.append("")
 
-        post_to_mattermost("frank-finance", "
-".join(report_lines), "finance-desk")
+        post_to_mattermost(
+            "frank-finance",
+            "\n".join(report_lines),
+            "finance-desk"
+        )
         log_to_dashboard("Daily invoice report posted by Frank", "info", "frank-finance")
+
     except Exception as e:
         print(f"[ERROR] Daily invoice report failed: {e}")
 
