@@ -14,7 +14,11 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
-from agents.payments.gocardless_handler import create_payment_with_gocardless
+import importlib.util as _ilu
+_gc_spec = _ilu.spec_from_file_location("gocardless_handler", "/home/milyfe/Desktop/TVS/agents/payments/gocardless_handler.py")
+_gc_mod = _ilu.module_from_spec(_gc_spec)
+_gc_spec.loader.exec_module(_gc_mod)
+create_payment_with_gocardless = _gc_mod.create_payment_with_gocardless
 
 load_dotenv('/home/milyfe/Desktop/TVS/.env')
 
