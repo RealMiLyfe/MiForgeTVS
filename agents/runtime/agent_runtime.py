@@ -456,44 +456,56 @@ def weekly_retrospective():
 # ============================================================
 
 def daily_invoice_report():
-    """Frank generates a daily invoice report."""
+    """Frank generates a daily hledger report."""
     print(f"[{datetime.now()}] Frank generating daily invoice report...")
-    
-    invoices = akaunting_get_invoices()
-    if not invoices:
-        post_to_mattermost("frank-finance", "📅 **Daily Invoice Report**\n\nNo invoices found today.", "finance-desk")
-        return
-    
-    total_amount = sum(invoice["amount"] for invoice in invoices)
-    vendor_counts = {}
-    
-    for invoice in invoices:
-        vendor_name = akaunting_check_vendor(invoice["vendor_id"])["name"]
-        if vendor_name in vendor_counts:
-            vendor_counts[vendor_name] += 1
-        else:
-            vendor_counts[vendor_name] = 1
-    
-    report = (f"📅 **Daily Invoice Report — {datetime.now().strftime('%B %d, %Y')}**\n\n"
-              f"**Total Invoices:** {len(invoices)}\n"
-              f"**Total Amount:** ${total_amount:.2f}\n"
-              f"**Vendors:**\n")
-    
-    for vendor, count in vendor_counts.items():
-        report += f"- {vendor}: {count} invoices\n"
 
-    # Add hledger balance command
     try:
-        result = subprocess.run(["hledger", "balance"], capture_output=True, text=True)
-        if result.returncode == 0:
-            report += "\n**Hledger Balance:**\n" + result.stdout
-        else:
-            print(f"[ERROR] Failed to get hledger balance: {result.stderr}")
-    except Exception as e:
-        print(f"[ERROR] Hledger command error: {e}")
+        client_ledgers = list(Path("/opt/milyfe/clients").glob("*/ledger/*.journal"))
+        if not client_ledgers:
+            post_to_mattermost("frank-finance", "📅 **Daily Finance Report**
 
-    post_to_mattermost("frank-finance", report, "finance-desk")
-    log_to_dashboard("Daily invoice report posted by Frank", "info", "frank-finance")
+No client ledgers found.", "finance-desk")
+            return
+
+        report_lines = [f"📅 **Daily Finance Report — {datetime.now().strftime('%B %d, %Y')}**
+"]
+        for ledger in client_ledgers:
+            client_name = ledger.stem
+            balance = subprocess.run(
+                ["hledger", "-f", str(ledger), "balance"],
+                capture_output=True,
+                text=True
+            )
+            register = subprocess.run(
+                ["hledger", "-f", str(ledger), "register"],
+                capture_output=True,
+                text=True
+            )
+
+            report_lines.append(f"**Client:** {client_name}")
+            if balance.returncode == 0:
+                report_lines.append("**Balance:**")
+                report_lines.append(f"```
+{balance.stdout.strip()}
+```")
+            else:
+                report_lines.append(f"Balance error: {balance.stderr.strip()}")
+
+            if register.returncode == 0 and register.stdout.strip():
+                report_lines.append("**Recent Transactions:**")
+                report_lines.append(f"```
+{register.stdout.strip()[:1500]}
+```")
+            else:
+                report_lines.append("No recent transactions.")
+
+            report_lines.append("")
+
+        post_to_mattermost("frank-finance", "
+".join(report_lines), "finance-desk")
+        log_to_dashboard("Daily invoice report posted by Frank", "info", "frank-finance")
+    except Exception as e:
+        print(f"[ERROR] Daily invoice report failed: {e}")
 
 # Schedule daily invoice report
 schedule.every().day.at("18:00").do(daily_invoice_report)
