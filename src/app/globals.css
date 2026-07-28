@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --milyfe-navy: #0B1D3A;
+    --milyfe-teal: #1B7A8F;
+    --milyfe-cyan: #14B8B8;
+    --milyfe-forge-green: #0F8A4C;
+    --milyfe-emerald: #22C55E;
+    --milyfe-bg: #05070D;
+    --milyfe-surface: #0B0F1A;
+    --milyfe-surface-2: #111827;
+    --milyfe-text: #EDF2F7;
+    --milyfe-text-muted: #8B95A7;
+    --milyfe-border: #1F2937;
+
+    --background: #05070D;
+    --foreground: #EDF2F7;
+    --card: #0B0F1A;
+    --card-foreground: #EDF2F7;
+    --popover: #0B0F1A;
+    --popover-foreground: #EDF2F7;
+    --primary: #22C55E;
+    --primary-foreground: #05070D;
+    --secondary: #111827;
+    --secondary-foreground: #EDF2F7;
+    --muted: #111827;
+    --muted-foreground: #8B95A7;
+    --accent: #1B7A8F;
+    --accent-foreground: #EDF2F7;
+    --destructive: #ef4444;
+    --destructive-foreground: #EDF2F7;
+    --border: #1F2937;
+    --input: #1F2937;
+    --ring: #14B8B8;
+    --radius: 0.625rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-milyfe-bg text-milyfe-text font-inter antialiased;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-milyfe-gradient {
+    background: linear-gradient(90deg, #0B1D3A 0%, #1B7A8F 45%, #22C55E 100%);
+  }
+
+  .text-milyfe-gradient {
+    background: linear-gradient(90deg, #0B1D3A 0%, #1B7A8F 45%, #22C55E 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
