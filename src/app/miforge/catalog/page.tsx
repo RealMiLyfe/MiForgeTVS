@@ -21,6 +21,7 @@ function CatalogContent() {
 
   const filteredAgents = useMemo(() => {
     return mockAgentCatalog.filter((agent) => {
+      if (agent.category === "platform") return false; // Hide platform-only agents
       if (category !== "all" && agent.category !== category) return false;
       if (status !== "all" && agent.status !== status) return false;
       if (search) {

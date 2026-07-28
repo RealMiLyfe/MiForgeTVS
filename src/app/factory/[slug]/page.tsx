@@ -13,6 +13,7 @@ import { SchematicGrid } from "@/components/shared/SchematicGrid";
 import { AgentCanvas } from "@/components/factory/AgentCanvas";
 import { AgentChatDrawer } from "@/components/factory/AgentChatDrawer";
 import { LiveActivityFeed } from "@/components/factory/LiveActivityFeed";
+import { PreviewFactoryBanner } from "@/components/concierge/PreviewFactoryBanner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Info } from "lucide-react";
 import Link from "next/link";
@@ -97,12 +98,18 @@ export default function FactoryPage() {
         </div>
       </motion.header>
 
-      {/* Specimen Banner */}
+      {/* Specimen / Preview Banner */}
       {factory.is_specimen && (
         <div className="relative z-10 w-full bg-milyfe-teal/10 border-b border-milyfe-teal/20 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2"><Info className="h-4 w-4 text-milyfe-cyan" /><span className="text-sm text-milyfe-text-muted">SPECIMEN FACTORY · Showcase demonstration.</span></div>
           <Link href="/miforge/bespoke"><Button variant="ghost" size="sm">Forge My Own →</Button></Link>
         </div>
+      )}
+      {!factory.is_specimen && slug.startsWith("preview-") && (
+        <PreviewFactoryBanner
+          contactName={factory.contact_name}
+          expiresAt={null}
+        />
       )}
 
 

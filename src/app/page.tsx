@@ -1,6 +1,6 @@
 "use client";
 
-import { Hero } from "@/components/home/Hero";
+import { ConciergeHero } from "@/components/home/ConciergeHero";
 import { LiveAssemblyCinematic } from "@/components/home/LiveAssemblyCinematic";
 import { SocialProofBand } from "@/components/home/SocialProofBand";
 import { ProductsShowcase } from "@/components/home/ProductsShowcase";
@@ -11,7 +11,7 @@ import { Footer } from "@/components/home/Footer";
 export default function Home() {
   return (
     <>
-      <Hero />
+      <ConciergeHero />
       <LiveAssemblyCinematic />
       <SocialProofBand />
       <ProductsShowcase />

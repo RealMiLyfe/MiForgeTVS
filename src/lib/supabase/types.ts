@@ -2,8 +2,8 @@
 
 export type UserRole = "client" | "operator" | "admin";
 export type FactoryStatus = "demo" | "checkout" | "activated" | "paused";
-export type AgentCategory = "ecommerce_ops" | "sales_growth" | "content" | "client_services" | "finance_ops" | "recruitment" | "bespoke";
-export type AgentStatus = "available" | "beta" | "coming_soon" | "bespoke_only";
+export type AgentCategory = "ecommerce_ops" | "sales_growth" | "content" | "client_services" | "finance_ops" | "recruitment" | "bespoke" | "platform";
+export type AgentStatus = "available" | "beta" | "coming_soon" | "bespoke_only" | "platform_only";
 export type FactoryAgentStatus = "demo" | "active" | "paused";
 export type PaymentProvider = "paddle" | "gocardless";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";

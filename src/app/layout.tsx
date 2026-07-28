@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalNav } from "@/components/layout/GlobalNav";
+import { ConciergeWidget } from "@/components/concierge/ConciergeWidget";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -49,6 +50,7 @@ export default function RootLayout({
         <AuthProvider>
           <GlobalNav />
           {children}
+          <ConciergeWidget />
           <Toaster />
         </AuthProvider>
       </body>

@@ -2,6 +2,12 @@ import type { AgentRouting } from "./types";
 
 // Agent slug → preferred provider + model + fallback chain
 const routingConfig: Record<string, AgentRouting> = {
+  forge_concierge: {
+    primary: { provider: "anthropic", model: "claude-3-5-sonnet-latest" },
+    fallback: { provider: "anthropic", model: "claude-3-5-haiku-latest" },
+    temperature: 0.7,
+    max_tokens: 1500,
+  },
   customer_service: {
     primary: { provider: "anthropic", model: "claude-3-5-haiku-latest" },
     fallback: { provider: "nvidia", model: "meta/llama-3.3-70b-instruct" },
