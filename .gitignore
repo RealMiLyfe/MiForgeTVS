@@ -46,3 +46,4 @@ venv/
 coverage/
 .yarn/install-state.gz
 next-env.d.ts
+.aider*
