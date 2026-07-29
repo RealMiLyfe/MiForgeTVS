@@ -7,7 +7,7 @@ senior_agents:
 
   calvin:
     display_name: "Calvin (Finance Lead)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - customer_service
       - fulfillment_monitor
@@ -16,7 +16,7 @@ senior_agents:
 
   serena:
     display_name: "Serena (Research Lead)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - seo_refresh
       - lead_qualification
@@ -25,7 +25,7 @@ senior_agents:
 
   frank:
     display_name: "Frank (Reporting Lead)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - ops_reporting
       - weekly_client_report
@@ -34,7 +34,7 @@ senior_agents:
 
   dex:
     display_name: "Dex (Ops Lead)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - cold_outbound
       - email_reactivation
@@ -44,7 +44,7 @@ senior_agents:
 
   lia:
     display_name: "Lia (Legal Lead)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - contract_review
       - proposal_generation
@@ -66,7 +66,7 @@ senior_agents:
 
   paula:
     display_name: "Paula (HR Lead)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - interview_coordinator
 
@@ -77,7 +77,7 @@ senior_agents:
 
   leo:
     display_name: "Leo (Learning/Retrospectives)"
-    ollama_model: "qwen2.5:14b"
+    ollama_model: "qwen2.5-coder:14b"
     catalog_agents_managed:
       - blog_content
       - newsletter

@@ -9,16 +9,16 @@ export interface SeniorAgent {
 
 const SENIOR_AGENTS: SeniorAgent[] = [
   { name: "forge", displayName: "Forge (Supervisor)", ollamaModel: null, catalogAgentsManaged: [] },
-  { name: "calvin", displayName: "Calvin (Finance Lead)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["customer_service", "fulfillment_monitor", "invoice_followup", "abandoned_cart_recovery"] },
-  { name: "serena", displayName: "Serena (Research Lead)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["seo_refresh", "lead_qualification", "influencer_outreach", "candidate_screening"] },
-  { name: "frank", displayName: "Frank (Reporting Lead)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["ops_reporting", "weekly_client_report", "financial_weekly_snapshot", "project_status_update"] },
-  { name: "dex", displayName: "Dex (Ops Lead)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["cold_outbound", "email_reactivation", "meeting_scheduling", "client_onboarding", "renewal_retention"] },
-  { name: "lia", displayName: "Lia (Legal Lead)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["contract_review", "proposal_generation", "deliverable_qa"] },
+  { name: "calvin", displayName: "Calvin (Finance Lead)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["customer_service", "fulfillment_monitor", "invoice_followup", "abandoned_cart_recovery"] },
+  { name: "serena", displayName: "Serena (Research Lead)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["seo_refresh", "lead_qualification", "influencer_outreach", "candidate_screening"] },
+  { name: "frank", displayName: "Frank (Reporting Lead)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["ops_reporting", "weekly_client_report", "financial_weekly_snapshot", "project_status_update"] },
+  { name: "dex", displayName: "Dex (Ops Lead)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["cold_outbound", "email_reactivation", "meeting_scheduling", "client_onboarding", "renewal_retention"] },
+  { name: "lia", displayName: "Lia (Legal Lead)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["contract_review", "proposal_generation", "deliverable_qa"] },
   { name: "ian", displayName: "Ian (Inventory Lead)", ollamaModel: "qwen2.5:7b", catalogAgentsManaged: ["product_launch", "expense_categorization"] },
   { name: "sam", displayName: "Sam (Support Lead)", ollamaModel: "qwen2.5:7b", catalogAgentsManaged: ["review_response", "onboarding_documentation"] },
-  { name: "paula", displayName: "Paula (HR Lead)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["interview_coordinator"] },
+  { name: "paula", displayName: "Paula (HR Lead)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["interview_coordinator"] },
   { name: "iris", displayName: "Iris (Vision/OCR)", ollamaModel: "llava:13b", catalogAgentsManaged: [] },
-  { name: "leo", displayName: "Leo (Learning/Retrospectives)", ollamaModel: "qwen2.5:14b", catalogAgentsManaged: ["blog_content", "newsletter", "podcast_shownotes", "youtube_script", "ad_copy", "social_content"] },
+  { name: "leo", displayName: "Leo (Learning/Retrospectives)", ollamaModel: "qwen2.5-coder:14b", catalogAgentsManaged: ["blog_content", "newsletter", "podcast_shownotes", "youtube_script", "ad_copy", "social_content"] },
 ];
 
 // Catalog slug → Senior agent name
