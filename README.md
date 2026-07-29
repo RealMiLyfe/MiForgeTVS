@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MiLyfe : MiForge — Unified Platform
 
-## Getting Started
+**MiLyfe forges autonomous businesses. Staffed by agents. Housed on sovereign hardware.**
 
-First, run the development server:
+## Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+/apps/miforge     → Next.js 14 presentation layer (client-facing)
+/apps/titan       → Venture Titan Studio operational engine (agent execution)
+/packages/bridge  → Integration layer between MiForge and Titan
+/packages/agent-mapping → 32 catalog agents → 11 senior agent resolver
+/infrastructure   → Supabase migrations + Docker configs
+/docs             → Architecture, integration, and deployment docs
+/scripts          → Unified startup and operational scripts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Quick Start
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start MiForge only (development without Titan)
+cd apps/miforge && npm install && npm run dev
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Start unified platform (requires Titan infrastructure)
+bash scripts/unified-start.sh
+```
 
-## Learn More
+## Data Sovereignty
 
-To learn more about Next.js, take a look at the following resources:
+- **Supabase**: Marketing content, prospect sessions, demo data only
+- **Titan PostgreSQL**: Real client data, ledgers, agent memory
+- **Ollama**: Local AI models (qwen2.5:14b, llava:13b)
+- Client data NEVER touches third-party clouds
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Documentation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Integration Guide](docs/INTEGRATION.md)
+- [Sovereign Positioning](docs/SOVEREIGN_POSITIONING.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Launch Checklist](docs/LAUNCH_CHECKLIST.md)

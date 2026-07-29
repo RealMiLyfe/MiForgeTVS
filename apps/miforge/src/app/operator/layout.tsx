@@ -18,6 +18,7 @@ const navItems = [
   { label: "Revenue", href: "/operator/revenue", icon: DollarSign },
   { label: "Catalog", href: "/operator/catalog", icon: BookOpen },
   { label: "Settings", href: "/operator/settings", icon: Settings },
+  { label: "Titan", href: "/operator/titan", icon: Factory },
 ];
 
 export default function OperatorLayout({ children }: { children: React.ReactNode }) {
