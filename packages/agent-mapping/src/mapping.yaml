@@ -1,0 +1,87 @@
+senior_agents:
+  forge:
+    display_name: "Forge (Supervisor)"
+    ollama_model: null
+    responsibilities: [orchestration, standup, handoffs]
+    catalog_agents_managed: []
+
+  calvin:
+    display_name: "Calvin (Finance Lead)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - customer_service
+      - fulfillment_monitor
+      - invoice_followup
+      - abandoned_cart_recovery
+
+  serena:
+    display_name: "Serena (Research Lead)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - seo_refresh
+      - lead_qualification
+      - influencer_outreach
+      - candidate_screening
+
+  frank:
+    display_name: "Frank (Reporting Lead)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - ops_reporting
+      - weekly_client_report
+      - financial_weekly_snapshot
+      - project_status_update
+
+  dex:
+    display_name: "Dex (Ops Lead)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - cold_outbound
+      - email_reactivation
+      - meeting_scheduling
+      - client_onboarding
+      - renewal_retention
+
+  lia:
+    display_name: "Lia (Legal Lead)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - contract_review
+      - proposal_generation
+      - deliverable_qa
+
+  ian:
+    display_name: "Ian (Inventory Lead)"
+    ollama_model: "qwen2.5:7b"
+    catalog_agents_managed:
+      - product_launch
+      - expense_categorization
+
+  sam:
+    display_name: "Sam (Support Lead)"
+    ollama_model: "qwen2.5:7b"
+    catalog_agents_managed:
+      - review_response
+      - onboarding_documentation
+
+  paula:
+    display_name: "Paula (HR Lead)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - interview_coordinator
+
+  iris:
+    display_name: "Iris (Vision/OCR)"
+    ollama_model: "llava:13b"
+    catalog_agents_managed: []
+
+  leo:
+    display_name: "Leo (Learning/Retrospectives)"
+    ollama_model: "qwen2.5:14b"
+    catalog_agents_managed:
+      - blog_content
+      - newsletter
+      - podcast_shownotes
+      - youtube_script
+      - ad_copy
+      - social_content

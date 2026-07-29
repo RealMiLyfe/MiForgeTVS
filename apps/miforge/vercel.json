@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "crons": [
+    { "path": "/api/cron/daily-checks", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/weekly-reports", "schedule": "0 9 * * 1" }
+  ]
+}
