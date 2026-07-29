@@ -8,5 +8,9 @@
       "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "NEXT_PUBLIC_PADDLE_CLIENT_TOKEN": "@NEXT_PUBLIC_PADDLE_CLIENT_TOKEN"
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/daily-checks", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/weekly-reports", "schedule": "0 9 * * 1" }
+  ]
 }
