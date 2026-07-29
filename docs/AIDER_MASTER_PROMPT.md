@@ -19,7 +19,7 @@ You are working on MiLyfe Venture Titan Studio, a production autonomous business
 | Service | Port | Notes |
 |---------|------|-------|
 | PostgreSQL | 5433 | DBs: milyfe_vts, mattermost, langfuse, n8n |
-| Ollama | 11434 | 15 models, primary: qwen2.5-coder:32b, agents use qwen2.5:14b |
+| Ollama | 11434 | 15 models, primary: qwen2.5:14b for agents |
 | Mattermost | 8065 | 14 channels, 11 bot accounts |
 | ChromaDB | 8001 | Use `/api/v2/` endpoints ONLY |
 | n8n | 5679 | 8 active workflows |
@@ -262,7 +262,7 @@ Add to `agent_api.py`:
   "data": {
     "data_location": "MiLyfe Venture Titan Studio — On-Premise Hardware",
     "hardware": "ASRock B460 / i9-10900F / RX 7900 XTX / Ubuntu 26.04",
-    "ai_models_used": ["qwen2.5:14b (local)", "qwen2.5-coder:32b (local)", "llava:13b (local)", "nomic-embed-text (local)"],
+    "ai_models_used": ["qwen2.5:14b (local)", "llava:13b (local)", "nomic-embed-text (local)"],
     "third_party_ai_calls_this_month": 0,
     "data_never_left_hardware": true,
     "ledger_transactions_stored": "<count from hledger>",
