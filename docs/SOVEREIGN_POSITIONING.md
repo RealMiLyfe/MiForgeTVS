@@ -9,7 +9,7 @@ MiLyfe operates on dedicated hardware that we own and control. Client data never
 
 ## Technical Implementation
 
-- **AI Models**: Ollama running locally (qwen2.5-coder:14b, qwen2.5:7b, llava:13b)
+- **AI Models**: Ollama running locally (hermes3:8b voice, qwen2.5:14b reasoning, qwen2.5:7b triage, llava:13b vision, nomic-embed-text embeddings)
 - **Database**: PostgreSQL on dedicated hardware (port 5433)
 - **Agent Memory**: ChromaDB on dedicated hardware
 - **Communications**: Self-hosted Mattermost

@@ -28,7 +28,7 @@ bash scripts/unified-start.sh
 
 - **Supabase**: Marketing content, prospect sessions, demo data only
 - **Titan PostgreSQL**: Real client data, ledgers, agent memory
-- **Ollama**: Local AI models (qwen2.5:14b, llava:13b)
+- **Ollama**: Local AI models (hermes3:3b/8b voice, nemotron-mini:4b orchestration, qwen2.5:14b reasoning, llava:13b vision)
 - Client data NEVER touches third-party clouds
 
 ## Documentation

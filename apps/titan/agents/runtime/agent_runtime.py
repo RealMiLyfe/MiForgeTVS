@@ -89,7 +89,7 @@ def daily_standup():
 def serena_research_company(company: str):
     """
     Serena researches a company: public info, financials, market position.
-    Uses Ollama qwen2.5-coder:14b for analysis.
+    Uses Ollama qwen2.5:14b for analysis.
     """
     prompt = f"""Research the company "{company}". Provide:
 1. What they do (1-2 sentences)
@@ -100,7 +100,7 @@ def serena_research_company(company: str):
 
 Be concise and factual."""
 
-    result = _ollama_generate("qwen2.5-coder:14b", prompt, system="You are Serena, a senior research analyst.")
+    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Serena, a senior research analyst.")
     return {"company": company, "analysis": result, "agent": "serena"}
 
 
@@ -145,7 +145,7 @@ Ledger data:
 
 Include: financial position, recent activity, and recommendations."""
 
-    result = _ollama_generate("qwen2.5-coder:14b", prompt, system="You are Frank, a senior reporting analyst.")
+    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Frank, a senior reporting analyst.")
     return {"client": client_name, "summary": result, "ledger": ledger_data, "agent": "frank"}
 
 
@@ -160,7 +160,7 @@ def frank_all_clients_summary():
     prompt = f"""Generate a portfolio summary for {len(clients)} clients: {', '.join(clients) or 'none yet'}.
 Summarize overall portfolio health, revenue trends, and priorities."""
 
-    result = _ollama_generate("qwen2.5-coder:14b", prompt, system="You are Frank, reporting lead for a multi-client portfolio.")
+    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Frank, reporting lead for a multi-client portfolio.")
     return {"clients": clients, "count": len(clients), "summary": result, "agent": "frank"}
 
 
@@ -212,7 +212,7 @@ def leo_weekly_error_report():
 
 Errors: {chr(10).join(errors[:50]) if errors else 'No errors found this week.'}"""
 
-    result = _ollama_generate("qwen2.5-coder:14b", prompt, system="You are Leo, a learning and retrospectives specialist.")
+    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Leo, a learning and retrospectives specialist.")
     return {"errors_found": len(errors), "analysis": result, "agent": "leo"}
 
 
@@ -229,7 +229,7 @@ Structure as:
 
 Base this on general operational health assessment."""
 
-    result = _ollama_generate("qwen2.5-coder:14b", prompt, system="You are Leo, facilitating a team retrospective.")
+    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Leo, facilitating a team retrospective.")
     return {"retrospective": result, "agent": "leo"}
 
 
@@ -290,7 +290,7 @@ Context: {context}
 
 Keep it concise, professional, and action-oriented. Include a clear ask or next step."""
 
-    result = _ollama_generate("qwen2.5-coder:14b", prompt, system="You are Dex, an operations lead drafting vendor communications.")
+    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Dex, an operations lead drafting vendor communications.")
     return {"vendor": vendor, "subject": subject, "draft": result, "agent": "dex"}
 
 
