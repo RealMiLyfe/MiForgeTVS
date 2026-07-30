@@ -1,6 +1,9 @@
 {
   "name": "miforge-tvs",
   "private": true,
+  "dependencies": {
+    "next": "14.2.35"
+  },
   "scripts": {
     "build": "cd apps/miforge && npm install && npm run build",
     "dev": "cd apps/miforge && npm run dev",
