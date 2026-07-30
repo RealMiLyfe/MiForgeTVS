@@ -1,0 +1,9 @@
+{
+  "name": "miforge-tvs",
+  "private": true,
+  "scripts": {
+    "build": "cd apps/miforge && npm install && npm run build",
+    "dev": "cd apps/miforge && npm run dev",
+    "start": "cd apps/miforge && npm run start"
+  }
+}

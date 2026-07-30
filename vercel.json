@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd apps/miforge && npm install && npm run build",
+  "outputDirectory": "apps/miforge/.next",
+  "framework": "nextjs",
+  "installCommand": "echo 'skipping root install'"
+}
