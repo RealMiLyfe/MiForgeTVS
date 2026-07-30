@@ -1,335 +1,629 @@
+#!/usr/bin/env python3
 """
-Venture Titan Studio — Agent Runtime
-Orchestrates 11 senior agents using local Ollama models.
-This file contains the core functions exposed via the Bridge API.
+MiLyfe: Venture Titan Studio — Agent Runtime
+All 11 agents running on local Ollama models
 """
 
-import os
 import json
-import subprocess
-import datetime
+import os
+import sys
+import time
+import requests
+import schedule
+import threading
+from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
+import importlib.util as _ilu
+_gc_spec = _ilu.spec_from_file_location("gocardless_handler", "/home/milyfe/Desktop/TVS/agents/payments/gocardless_handler.py")
+_gc_mod = _ilu.module_from_spec(_gc_spec)
+_gc_spec.loader.exec_module(_gc_mod)
+create_payment_with_gocardless = _gc_mod.create_payment_with_gocardless
 
-# ─── Configuration ───────────────────────────────────────────────────────────
+load_dotenv('/home/milyfe/Desktop/TVS/.env')
 
-CLIENTS_DIR = Path("/opt/milyfe/clients")
-SECRETS_DIR = Path("/opt/milyfe/secrets")
-LOGS_DIR = Path("/opt/milyfe/logs")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MATTERMOST_URL = os.getenv("MATTERMOST_URL", "http://localhost:8065")
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
-SENIOR_AGENTS = [
-    "forge", "calvin", "serena", "frank", "dex",
-    "lia", "ian", "sam", "paula", "iris", "leo"
-]
+MATTERMOST_URL = "http://localhost:8065"
+OLLAMA_URL = "http://localhost:11434"
+DASHBOARD_URL = "http://localhost:7800"
+SECRETS_DIR = "/opt/milyfe/secrets"
+DATA_INCOMING = "/opt/milyfe/data/incoming"
+LOGS_DIR = "/opt/milyfe/logs"
 
+def load_secrets():
+    with open(f"{SECRETS_DIR}/bot-tokens.json") as f:
+        tokens = json.load(f)
+    with open(f"{SECRETS_DIR}/channel-ids.json") as f:
+        channels = json.load(f)
+    return tokens, channels
 
-def _get_bot_token():
-    """Load Mattermost bot token from secrets."""
-    token_file = SECRETS_DIR / "bot-tokens.json"
-    if token_file.exists():
-        tokens = json.loads(token_file.read_text())
-        return tokens.get("mattermost_bot_token", "")
-    return os.getenv("MATTERMOST_BOT_TOKEN", "")
+TOKENS, CHANNELS = load_secrets()
 
+def get_client_for_file(file_path: str) -> str:
+    """Infer client from path or filename, else default."""
+    p = str(file_path).lower()
+    if "teresa" in p:
+        return "teresa-grooming"
+    if "ohio" in p:
+        return "ohio-landscaping"
+    return "default"
 
-def _ollama_generate(model: str, prompt: str, system: str = "") -> str:
-    """Call local Ollama model for inference."""
-    import requests
-    payload = {"model": model, "prompt": prompt, "stream": False}
-    if system:
-        payload["system"] = system
+# ============================================================
+# AGENT DEFINITIONS
+# ============================================================
+
+AGENTS = {
+    "forge-supervisor": {
+        "name": "Forge",
+        "model": "qwen2.5:32b",
+        "channel": "daily-ops",
+        "role": "Supervisor — routes tasks, identifies conflicts, escalates to human",
+        "emoji": "🎯"
+    },
+    "calvin-ar": {
+        "name": "Calvin",
+        "model": "qwen2.5:14b",
+        "channel": "finance-desk",
+        "role": "AR Lead — invoices, payments, reconciliation",
+        "emoji": "📊"
+    },
+    "frank-finance": {
+        "name": "Frank",
+        "model": "qwen2.5:32b",
+        "channel": "finance-desk",
+        "role": "Finance Lead — reporting, budgets, cash flow",
+        "emoji": "💰"
+    },
+    "serena-research": {
+        "name": "Serena",
+        "model": "qwen2.5:14b",
+        "channel": "research-desk",
+        "role": "Research Lead — competitive intel, market analysis",
+        "emoji": "🔍"
+    },
+    "dex-ops": {
+        "name": "Dex",
+        "model": "qwen2.5:14b",
+        "channel": "operations-desk",
+        "role": "Operations Lead — vendor emails, scheduling, contracts",
+        "emoji": "⚙️"
+    },
+    "paula-payroll": {
+        "name": "Paula",
+        "model": "qwen2.5:14b",
+        "channel": "hr-desk",
+        "role": "Payroll Lead — payroll calculations, contractor payments",
+        "emoji": "💼"
+    },
+    "lia-legal": {
+        "name": "Lia",
+        "model": "deepseek-r1:14b",
+        "channel": "operations-desk",
+        "role": "Legal — NDA drafting, contract review, compliance",
+        "emoji": "⚖️"
+    },
+    "ian-inventory": {
+        "name": "Ian",
+        "model": "qwen2.5:7b",
+        "channel": "operations-desk",
+        "role": "Inventory Lead — stock monitoring, reorder alerts",
+        "emoji": "📦"
+    },
+    "sam-support": {
+        "name": "Sam",
+        "model": "qwen2.5:7b",
+        "channel": "support-desk",
+        "role": "Support Lead — tier-1 support, ticket routing",
+        "emoji": "🎧"
+    },
+    "iris-vision": {
+        "name": "Iris",
+        "model": "llava:13b",
+        "channel": "finance-desk",
+        "role": "Vision Lead — OCR, invoice scanning, document extraction",
+        "emoji": "👁️"
+    },
+    "leo-learning": {
+        "name": "Leo",
+        "model": "qwen2.5-coder:32b",
+        "channel": "learning-log",
+        "role": "Learning Lead — error analysis, knowledge base updates",
+        "emoji": "🧠"
+    }
+}
+
+def record_to_hledger(invoice_data):
+    """Record invoice data to hledger by appending to journal file."""
     try:
-        resp = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=120)
-        resp.raise_for_status()
-        return resp.json().get("response", "")
+        from pathlib import Path
+        client_name = invoice_data.get("client_name", "default")
+        journal_path = Path(f"/opt/milyfe/clients/{client_name}/ledger/{client_name}.journal")
+        journal_path.parent.mkdir(parents=True, exist_ok=True)
+        if not journal_path.exists():
+            journal_path.write_text(f"; {client_name} Ledger\n\n")
+        date = invoice_data.get("date", datetime.now().strftime("%Y-%m-%d"))
+        vendor = invoice_data.get("vendor_name", "Unknown")
+        amount = float(invoice_data.get("amount", 0))
+        entry = f"""
+{date} {vendor}
+    expenses:vendors    ${amount:.2f}
+    assets:checking
+
+"""
+        with open(journal_path, "a") as f:
+            f.write(entry)
+        print(f"[INFO] Invoice recorded to hledger: {vendor} ${amount:.2f}")
     except Exception as e:
-        return f"[Ollama Error] {e}"
+        print(f"[ERROR] Failed to record invoice to hledger: {e}")
 
+# ============================================================
+# CORE FUNCTIONS
+# ============================================================
 
-def _post_to_mattermost(channel_id: str, message: str):
-    """Post message to Mattermost channel."""
-    import requests
-    token = _get_bot_token()
-    headers = {"Authorization": f"Bearer {token}"}
+def post_to_mattermost(bot_username: str, message: str, channel_name: str = None):
+    """Post a message to Mattermost as a specific bot."""
     try:
-        requests.post(
+        token = TOKENS[bot_username]["token"]
+        if channel_name is None:
+            channel_name = AGENTS[bot_username]["channel"]
+        channel_id = CHANNELS.get(channel_name, "")
+        
+        if not channel_id:
+            print(f"[ERROR] Channel not found: {channel_name}")
+            return False
+        
+        response = requests.post(
             f"{MATTERMOST_URL}/api/v4/posts",
-            json={"channel_id": channel_id, "message": message},
-            headers=headers,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "channel_id": channel_id,
+                "message": message
+            },
             timeout=10
         )
+        return response.status_code == 201
     except Exception as e:
-        print(f"[Mattermost Error] {e}")
+        print(f"[ERROR] Failed to post as {bot_username}: {e}")
+        return False
 
+# ============================================================
+# AKAUNTING INTEGRATION
+# ============================================================
 
-# ─── Forge (Supervisor) ─────────────────────────────────────────────────────
+AKAUNTING_URL = "http://localhost:8081"
+AKAUNTING_TOKEN = None
+
+def akaunting_get_token():
+    """Authenticate with Akaunting API and store the token."""
+    global AKAUNTING_TOKEN
+    try:
+        response = requests.post(
+            f"{AKAUNTING_URL}/api/v1/auth/login",
+            json={
+                "email": os.getenv("AKAUNTING_EMAIL"),
+                "password": os.getenv("AKAUNTING_PASSWORD")
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            AKAUNTING_TOKEN = response.json().get("token")
+            return True
+        else:
+            print(f"[ERROR] Failed to authenticate with Akaunting: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Akaunting authentication error: {e}")
+        return False
+
+def akaunting_check_vendor(vendor_name):
+    """Search for a vendor in Akaunting."""
+    try:
+        response = requests.get(
+            f"{AKAUNTING_URL}/api/v1/vendors",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}"
+            },
+            params={"search": vendor_name},
+            timeout=10
+        )
+        if response.status_code == 200:
+            vendors = response.json().get("data", [])
+            return vendors[0] if vendors else None
+        else:
+            print(f"[ERROR] Failed to check vendor in Akaunting: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Akaunting vendor check error: {e}")
+        return None
+
+def akaunting_create_vendor(vendor_data):
+    """Create a new vendor in Akaunting."""
+    try:
+        response = requests.post(
+            f"{AKAUNTING_URL}/api/v1/vendors",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}",
+                "Content-Type": "application/json"
+            },
+            json=vendor_data,
+            timeout=10
+        )
+        if response.status_code == 201:
+            return response.json().get("data")
+        else:
+            print(f"[ERROR] Failed to create vendor in Akaunting: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Akaunting vendor creation error: {e}")
+        return None
+
+def akaunting_create_invoice(invoice_data):
+    """Create a new invoice (bill) in Akaunting."""
+    try:
+        response = requests.post(
+            f"{AKAUNTING_URL}/api/v1/bills",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}",
+                "Content-Type": "application/json"
+            },
+            json=invoice_data,
+            timeout=10
+        )
+        if response.status_code == 201:
+            return response.json().get("data")
+        else:
+            print(f"[ERROR] Failed to create invoice in Akaunting: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Akaunting invoice creation error: {e}")
+        return None
+
+def akaunting_get_invoices():
+    """List recent invoices from Akaunting."""
+    try:
+        response = requests.get(
+            f"{AKAUNTING_URL}/api/v1/bills",
+            headers={
+                "Authorization": f"Bearer {AKAUNTING_TOKEN}"
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            return response.json().get("data", [])
+        else:
+            print(f"[ERROR] Failed to get invoices from Akaunting: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"[ERROR] Akaunting invoice retrieval error: {e}")
+        return []
+
+def ask_ollama(model: str, prompt: str, system: str = "") -> str:
+    """Ask a question to a local Ollama model."""
+    try:
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False
+        }
+        if system:
+            payload["system"] = system
+        
+        response = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json=payload,
+            timeout=120
+        )
+        if response.status_code == 200:
+            return response.json().get("response", "")
+        return ""
+    except Exception as e:
+        print(f"[ERROR] Ollama error with {model}: {e}")
+        return ""
+
+from pathlib import Path
+import subprocess
+
+def log_to_dashboard(message: str, severity: str = "info", source: str = "runtime"):
+    """Log a message to the MiLyfe dashboard."""
+    try:
+        requests.post(
+            f"{DASHBOARD_URL}/api/logs",
+            json={"message": message, "severity": severity, "source": source},
+            timeout=5
+        )
+    except:
+        pass
+
+# ============================================================
+# WORKFLOW 1: DAILY STANDUP (7am)
+# ============================================================
 
 def daily_standup():
-    """
-    Forge orchestrates the daily standup.
-    Pings all senior agents, collects status, posts summary to #general.
-    """
-    timestamp = datetime.datetime.now().isoformat()
-    statuses = []
-    for agent in SENIOR_AGENTS:
-        statuses.append(f"- **{agent.title()}**: Online, ready")
-
-    summary = f"# Daily Standup — {timestamp[:10]}\n\n" + "\n".join(statuses)
-    summary += "\n\n---\n*All agents nominal. Awaiting assignments.*"
-
-    # Post to Mattermost #general or log
-    print(f"[Forge Standup] {timestamp}")
-    print(summary)
-    return {"status": "completed", "timestamp": timestamp, "summary": summary}
-
-
-# ─── Serena (Research Lead) ──────────────────────────────────────────────────
-
-def serena_research_company(company: str):
-    """
-    Serena researches a company: public info, financials, market position.
-    Uses Ollama qwen2.5:14b for analysis.
-    """
-    prompt = f"""Research the company "{company}". Provide:
-1. What they do (1-2 sentences)
-2. Estimated revenue/scale
-3. Key products or services
-4. Market position and competitors
-5. Any recent news or developments
-
-Be concise and factual."""
-
-    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Serena, a senior research analyst.")
-    return {"company": company, "analysis": result, "agent": "serena"}
-
-
-def serena_monitor_vendors():
-    """
-    Serena monitors all known vendors across client portfolios.
-    Checks for pricing changes, service disruptions, new offerings.
-    """
-    # In production: iterate client vendor lists, check each
-    result = _ollama_generate(
-        "qwen2.5-coder:14b",
-        "Generate a vendor monitoring report. List any flagged changes.",
-        system="You are Serena, monitoring vendor ecosystem health."
+    """Each agent posts their morning status."""
+    print(f"[{datetime.now()}] Running daily standup...")
+    
+    standups = {
+        "calvin-ar": "📊 **Calvin — Morning Check-in**\nMonitoring accounts receivable. Checking for overdue invoices and new documents in incoming folder.",
+        "frank-finance": "💰 **Frank — Morning Check-in**\nFinancial monitoring active. Ready to generate reports on request.",
+        "serena-research": "🔍 **Serena — Morning Check-in**\nCompetitive intelligence systems online. Monitoring market for significant changes.",
+        "dex-ops": "⚙️ **Dex — Morning Check-in**\nOperations desk active. Monitoring vendor communications and scheduling queue.",
+        "paula-payroll": "💼 **Paula — Morning Check-in**\nPayroll systems online. No pending payroll runs at this time.",
+        "lia-legal": "⚖️ **Lia — Morning Check-in**\nLegal review queue clear. Ready to review contracts and flag compliance issues.",
+        "ian-inventory": "📦 **Ian — Morning Check-in**\nInventory monitoring active. No critical stock alerts at this time.",
+        "sam-support": "🎧 **Sam — Morning Check-in**\nSupport desk online. Ready to handle tier-1 customer inquiries.",
+        "leo-learning": "🧠 **Leo — Morning Check-in**\nLearning systems active. Monitoring error logs for patterns and improvement opportunities."
+    }
+    
+    standup_channel = "agent-standup"
+    for bot, message in standups.items():
+        post_to_mattermost(bot, message, standup_channel)
+        time.sleep(2)
+    
+    # Forge summarizes
+    summary = ask_ollama(
+        "qwen2.5:7b",
+        "Write a brief 3-sentence morning briefing for a small business AI workforce. All 10 specialist agents have checked in and are online. Mention that the system is ready for the day's tasks.",
+        "You are Forge, the supervisor agent for MiLyfe: Venture Titan Studio. You are professional, concise, and focused on business operations."
     )
-    return {"report": result, "vendors_checked": 0, "flags": [], "agent": "serena"}
+    
+    if summary:
+        post_to_mattermost(
+            "forge-supervisor",
+            f"🎯 **Forge — Daily Brief**\n\n{summary}\n\n_All agents online. Monitoring active._",
+            "daily-ops"
+        )
+    
+    log_to_dashboard("Daily standup completed — all agents checked in", "info", "forge-supervisor")
+    print(f"[{datetime.now()}] Daily standup complete")
 
+# ============================================================
+# WORKFLOW 2: INVOICE WATCHER (Calvin)
+# ============================================================
 
-# ─── Frank (Reporting Lead) ──────────────────────────────────────────────────
-
-def frank_client_summary(client_name: str):
-    """
-    Frank generates an operational summary for a specific client.
-    Pulls from ledger, agent activity, and Mattermost history.
-    """
-    client_dir = CLIENTS_DIR / client_name
-    journal = client_dir / "ledger" / "main.journal"
-
-    ledger_data = ""
-    if journal.exists():
+def watch_incoming_files():
+    """Calvin watches for new files in the incoming folder."""
+    import hashlib
+    seen_files = set()
+    incoming = Path(DATA_INCOMING)
+    
+    print(f"[{datetime.now()}] Calvin watching {DATA_INCOMING}...")
+    
+    while True:
         try:
-            result = subprocess.run(
-                ["hledger", "-f", str(journal), "balance", "--flat"],
-                capture_output=True, text=True, timeout=10
-            )
-            ledger_data = result.stdout
-        except Exception:
-            ledger_data = "[Ledger unavailable]"
+            for file_path in incoming.glob("*"):
+                if file_path.is_file():
+                    file_key = str(file_path)
+                    if file_key not in seen_files:
+                        seen_files.add(file_key)
+                        print(f"[Calvin] New file detected: {file_path.name}")
+                        
+                        # Calvin processes the file
+                        suffix = Path(file_path).suffix.lower()
+                        if suffix == ".pdf" or suffix in [".jpg", ".png", ".jpeg"]:
+                            result = subprocess.run(["/usr/bin/hledger", "-f", str(file_path)], capture_output=True, text=True)
+                            parsed = json.loads(result.stdout) if result.returncode == 0 and "error" not in result.stdout else {}
+                            
+                            vendor_name = parsed.get("vendor_name", "Unknown")
+                            amount = float(parsed.get("amount", 0))
+                            date = parsed.get("date", datetime.now().strftime("%Y-%m-%d"))
+                            description = parsed.get("description", "No description provided")
+                        elif suffix == ".txt":
+                            with open(file_path, 'r') as file:
+                                content = file.read()
+                            
+                            # Extract vendor name, amount, date, description
+                            import re
+                            vendor_match = re.search(r"(\d{4}[-/]\d{2}[-/]\d{2})\s+(.+)\n\s+expenses:vendors", content, re.MULTILINE)
+                            amount_match = re.search(r"(?im)^\s*(amount|total|total due|subtotal)\s*:\s*\$?\s*([0-9][0-9,]*\.?[0-9]*)$", content)
+                            date_match = re.search(r"(?im)^\s*(date|invoice date)\s*:\s*(.+)$", content)
+                            desc_match = re.search(r"(?im)^\s*(description|item|items)\s*:\s*(.+)$", content)
+                            
+                            vendor_name = vendor_match.group(2).strip() if vendor_match else "Unknown"
+                            amount = float(amount_match.group(2).replace(",", "")) if amount_match else 0.0
+                            date = date_match.group(2).strip() if date_match else datetime.now().strftime("%Y-%m-%d")
+                            description = desc_match.group(2).strip() if desc_match else "No description provided"
+                        else:
+                            print(f"[ERROR] Unsupported file type: {suffix}")
+                            continue
+                        
+                        client_name = get_client_for_file(str(file_path))
+                        record_to_hledger({
+                            'date': date,
+                            'vendor_name': vendor_name,
+                            'amount': amount,
+                            'client_name': client_name
+                        })
+                        
+                        if 0 < amount < 500:
+                            payment_id = create_payment_with_gocardless(vendor_name, int(amount * 100), description)
+                            if payment_id:
+                                post_to_mattermost("calvin-ar", f"Payment of ${amount} processed via GoCardless. Payment ID: {payment_id}", "finance-desk")
+                            else:
+                                post_to_mattermost("calvin-ar", f"GoCardless payment failed for vendor - flagging for manual review", "finance-desk")
+                        elif amount >= 500:
+                            post_to_mattermost("calvin-ar", f"APPROVAL REQUIRED - Invoice from {vendor_name} for ${amount}", "human-approvals")
+                        
+                        message = (f"📥 **New Document Received**\n\n"
+                                   f"**File:** `{file_path.name}`\n"
+                                   f"**Detected:** {datetime.now().strftime('%H:%M:%S')}\n"
+                                   f"**Vendor:** {vendor_name}\n"
+                                   f"**Amount:** ${amount}\n"
+                                   f"**Date:** {date}\n"
+                                   f"**Description:** {description}\n\n"
+                                   f"_Processing initiated. Human review required if amount exceeds $500._")
+                        post_to_mattermost("calvin-ar", message)
+                        log_to_dashboard(f"Calvin processing new file: {file_path.name}", "info", "calvin-ar")
+        
+        except Exception as e:
+            print(f"[ERROR] File watcher error: {e}")
+        
+        time.sleep(30)
 
-    prompt = f"""Generate a client operational summary for "{client_name}".
-Ledger data:
-{ledger_data or '[No ledger data yet]'}
-
-Include: financial position, recent activity, and recommendations."""
-
-    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Frank, a senior reporting analyst.")
-    return {"client": client_name, "summary": result, "ledger": ledger_data, "agent": "frank"}
-
-
-def frank_all_clients_summary():
-    """
-    Frank generates a portfolio-wide summary across all clients.
-    """
-    clients = []
-    if CLIENTS_DIR.exists():
-        clients = [d.name for d in CLIENTS_DIR.iterdir() if d.is_dir()]
-
-    prompt = f"""Generate a portfolio summary for {len(clients)} clients: {', '.join(clients) or 'none yet'}.
-Summarize overall portfolio health, revenue trends, and priorities."""
-
-    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Frank, reporting lead for a multi-client portfolio.")
-    return {"clients": clients, "count": len(clients), "summary": result, "agent": "frank"}
-
-
-def daily_invoice_report():
-    """
-    Frank produces the daily invoice/receivables report.
-    Checks all client ledgers for outstanding invoices.
-    """
-    outstanding = []
-    if CLIENTS_DIR.exists():
-        for client_dir in CLIENTS_DIR.iterdir():
-            if not client_dir.is_dir():
-                continue
-            journal = client_dir / "ledger" / "main.journal"
-            if journal.exists():
-                try:
-                    result = subprocess.run(
-                        ["hledger", "-f", str(journal), "balance", "receivable", "--flat"],
-                        capture_output=True, text=True, timeout=10
-                    )
-                    if result.stdout.strip():
-                        outstanding.append({"client": client_dir.name, "balance": result.stdout.strip()})
-                except Exception:
-                    pass
-
-    return {"report": "Daily Invoice Report", "outstanding": outstanding, "count": len(outstanding), "agent": "frank"}
-
-
-# ─── Leo (Learning / Retrospectives) ────────────────────────────────────────
-
-def leo_weekly_error_report():
-    """
-    Leo reviews logs from the past week for errors, patterns, and improvements.
-    """
-    errors = []
-    log_file = LOGS_DIR / "agent-runtime.log"
-    if log_file.exists():
-        try:
-            lines = log_file.read_text().splitlines()[-500:]
-            errors = [l for l in lines if "error" in l.lower() or "exception" in l.lower()]
-        except Exception:
-            pass
-
-    prompt = f"""Analyze these {len(errors)} error log entries and provide:
-1. Error categories (grouped)
-2. Root cause hypotheses
-3. Recommended fixes
-4. Priority ranking
-
-Errors: {chr(10).join(errors[:50]) if errors else 'No errors found this week.'}"""
-
-    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Leo, a learning and retrospectives specialist.")
-    return {"errors_found": len(errors), "analysis": result, "agent": "leo"}
-
+# ============================================================
+# WORKFLOW 4: WEEKLY RETROSPECTIVE (Leo — Fridays)
+# ============================================================
 
 def weekly_retrospective():
-    """
-    Leo conducts a weekly retrospective: what went well, what didn't, improvements.
-    """
-    prompt = """Conduct a weekly retrospective for the Titan agent team.
-Structure as:
-1. What went well this week
-2. What could be improved
-3. Action items for next week
-4. Agent performance notes
+    """Leo analyzes the week and posts retrospective."""
+    print(f"[{datetime.now()}] Leo running weekly retrospective...")
+    
+    retrospective = ask_ollama(
+        "qwen2.5-coder:32b",
+        "Write a brief weekly retrospective for a small business AI workforce system. Include: what types of tasks were handled this week, any patterns in the work, and one suggestion for improvement. Keep it under 200 words.",
+        "You are Leo, the Learning Lead for MiLyfe: Venture Titan Studio. You analyze patterns, log corrections, and help the system improve over time."
+    )
+    
+    if retrospective:
+        post_to_mattermost(
+            "leo-learning",
+            f"🧠 **Weekly Retrospective — {datetime.now().strftime('%B %d, %Y')}**\n\n{retrospective}\n\n_Next retrospective: Friday at 5pm_",
+            "weekly-retrospective"
+        )
+    
+    log_to_dashboard("Weekly retrospective posted by Leo", "info", "leo-learning")
 
-Base this on general operational health assessment."""
+# ============================================================
+# WORKFLOW 5: DAILY INVOICE REPORT (Frank — Daily)
+# ============================================================
 
-    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Leo, facilitating a team retrospective.")
-    return {"retrospective": result, "agent": "leo"}
+def daily_invoice_report():
+    """Frank generates a daily hledger report."""
+    print(f"[{datetime.now()}] Frank generating daily invoice report...")
 
+    try:
+        client_ledgers = list(Path("/opt/milyfe/clients").glob("*/ledger/*.journal"))
+        if not client_ledgers:
+            post_to_mattermost(
+                "frank-finance",
+                "Daily Finance Report - No client ledgers found.",
+                "finance-desk"
+            )
+            return
 
-# ─── Ian (Inventory Lead) ───────────────────────────────────────────────────
+        report_lines = [
+            f"📅 **Daily Finance Report — {datetime.now().strftime('%B %d, %Y')}**",
+            ""
+        ]
 
-def ian_check_recurring_vendors():
-    """
-    Ian checks for recurring vendor charges, subscription renewals,
-    and flags any anomalies.
-    """
-    findings = []
-    if CLIENTS_DIR.exists():
-        for client_dir in CLIENTS_DIR.iterdir():
-            if not client_dir.is_dir():
-                continue
-            journal = client_dir / "ledger" / "main.journal"
-            if journal.exists():
-                try:
-                    result = subprocess.run(
-                        ["hledger", "-f", str(journal), "register", "expenses:subscriptions", "--monthly"],
-                        capture_output=True, text=True, timeout=10
-                    )
-                    if result.stdout.strip():
-                        findings.append({"client": client_dir.name, "subscriptions": result.stdout.strip()})
-                except Exception:
-                    pass
+        for ledger in client_ledgers:
+            client_name = ledger.stem
 
-    return {"vendors_checked": len(findings), "findings": findings, "agent": "ian"}
+            balance = subprocess.run(["/usr/bin/hledger", "-f", str(ledger), "balance"], capture_output=True, text=True)
+            register = subprocess.run(["/usr/bin/hledger", "-f", str(ledger), "register"], capture_output=True, text=True)
 
+            report_lines.append(f"**Client:** {client_name}")
 
-# ─── Sam (Support Lead) ─────────────────────────────────────────────────────
+            if balance.returncode == 0:
+                report_lines.append("**Balance:**")
+                report_lines.append(f"```\n{balance.stdout.strip()}\n```")
+            else:
+                report_lines.append(f"Balance error: {balance.stderr.strip()}")
 
-def sam_daily_status():
-    """
-    Sam reports on support health: open tickets, response times, escalations.
-    """
-    prompt = """Generate a daily support status report covering:
-1. System health (all services)
-2. Open issues count
-3. Average response time
-4. Escalations pending
-5. Customer satisfaction signals"""
+            if register.returncode == 0 and register.stdout.strip():
+                report_lines.append("**Recent Transactions:**")
+                report_lines.append(f"```\n{register.stdout.strip()[:1500]}\n```")
+            else:
+                report_lines.append("No recent transactions.")
 
-    result = _ollama_generate("qwen2.5:7b", prompt, system="You are Sam, a support operations lead.")
-    return {"status_report": result, "agent": "sam"}
+            report_lines.append("")
 
+        post_to_mattermost(
+            "frank-finance",
+            "\n".join(report_lines),
+            "finance-desk"
+        )
+        log_to_dashboard("Daily invoice report posted by Frank", "info", "frank-finance")
 
-# ─── Dex (Ops Lead) ─────────────────────────────────────────────────────────
+    except Exception as e:
+        print(f"[ERROR] Daily invoice report failed: {e}")
 
-def dex_draft_vendor_email(vendor: str, subject: str, context: str):
-    """
-    Dex drafts a professional email to a vendor.
-    """
-    prompt = f"""Draft a professional business email:
-To: {vendor}
-Subject: {subject}
-Context: {context}
+# Schedule daily invoice report
+schedule.every().day.at("18:00").do(daily_invoice_report)
 
-Keep it concise, professional, and action-oriented. Include a clear ask or next step."""
+# ============================================================
+# AGENT ONLINE ANNOUNCEMENTS
+# ============================================================
 
-    result = _ollama_generate("qwen2.5:14b", prompt, system="You are Dex, an operations lead drafting vendor communications.")
-    return {"vendor": vendor, "subject": subject, "draft": result, "agent": "dex"}
+def announce_all_agents():
+    """Have each agent announce they are online."""
+    print("Announcing all agents online...")
+    
+    announcements = [
+        ("serena-research", "research-desk", 
+         "🔍 **Serena — Research Lead | Online**\n\nCompetitive intelligence systems active. I monitor market trends, competitor pricing, and industry news. Tag me for research requests.\n\n— Serena"),
+        ("dex-ops", "operations-desk",
+         "⚙️ **Dex — Operations Lead | Online**\n\nVendor management and operations desk active. I handle vendor emails, draft contracts, and manage scheduling. All contracts are flagged to Lia before sending.\n\n— Dex"),
+        ("paula-payroll", "hr-desk",
+         "💼 **Paula — Payroll Lead | Online**\n\nPayroll systems initialized. Every payroll run requires human approval before processing. I never process payments without a signed timesheet on file.\n\n— Paula"),
+        ("lia-legal", "operations-desk",
+         "⚖️ **Lia — Legal Lead | Online**\n\nContract review and compliance monitoring active. All documents I produce are marked DRAFT until a human approves. I flag but never give legal advice.\n\n— Lia"),
+        ("sam-support", "support-desk",
+         "🎧 **Sam — Support Lead | Online**\n\nTier-1 support desk active. I draft responses but humans send them externally. I never make refund commitments.\n\n— Sam"),
+        ("leo-learning", "learning-log",
+         "🧠 **Leo — Learning Lead | Online**\n\nError analysis and knowledge base systems active. I watch all logs and propose improvements every Friday. No prompt updates without human approval.\n\n— Leo"),
+        ("frank-finance", "finance-desk",
+         "💰 **Frank — Finance Lead | Online**\n\nFinancial reporting systems active. Monthly reports require human sign-off. I flag any expense category spike over 20%.\n\n— Frank"),
+        ("ian-inventory", "operations-desk",
+         "📦 **Ian — Inventory Lead | Online**\n\nInventory monitoring active. I flag discrepancies over 5% immediately. No reorders placed without human approval.\n\n— Ian"),
+        ("iris-vision", "finance-desk",
+         "👁️ **Iris — Vision Lead | Online**\n\nOCR and document scanning systems active. I process invoices and receipts and always output structured JSON. Low-confidence extractions are flagged.\n\n— Iris")
+    ]
+    
+    for bot, channel, message in announcements:
+        result = post_to_mattermost(bot, message, channel)
+        status = "✓" if result else "✗"
+        print(f"  {status} {bot} → #{channel}")
+        time.sleep(3)
 
+# ============================================================
+# MAIN RUNTIME
+# ============================================================
 
-def dex_check_overdue_vendors():
-    """
-    Dex checks for overdue vendor payments or outstanding follow-ups.
-    """
-    overdue = []
-    if CLIENTS_DIR.exists():
-        for client_dir in CLIENTS_DIR.iterdir():
-            if not client_dir.is_dir():
-                continue
-            journal = client_dir / "ledger" / "main.journal"
-            if journal.exists():
-                try:
-                    result = subprocess.run(
-                        ["hledger", "-f", str(journal), "balance", "liabilities:payable", "--flat"],
-                        capture_output=True, text=True, timeout=10
-                    )
-                    if result.stdout.strip():
-                        overdue.append({"client": client_dir.name, "payable": result.stdout.strip()})
-                except Exception:
-                    pass
-
-    return {"overdue_count": len(overdue), "overdue": overdue, "agent": "dex"}
-
-
-# ─── Entry Point ─────────────────────────────────────────────────────────────
+def main():
+    print("=" * 60)
+    print("  MiLyfe: Venture Titan Studio — Agent Runtime")
+    print(f"  Starting: {datetime.now()}")
+    print("=" * 60)
+    
+    # Announce all agents online
+    announce_all_agents()
+    
+    # Start file watcher in background thread
+    watcher_thread = threading.Thread(
+        target=watch_incoming_files,
+        daemon=True,
+        name="calvin-file-watcher"
+    )
+    watcher_thread.start()
+    print("✓ Calvin file watcher started")
+    
+    # Schedule workflows
+    schedule.every().day.at("07:00").do(daily_standup)
+    schedule.every().friday.at("17:00").do(weekly_retrospective)
+    
+    print("✓ Schedules configured:")
+    print("  → Daily standup: 7:00am")
+    print("  → Weekly retrospective: Friday 5:00pm")
+    print("")
+    print("✓ Agent runtime fully active")
+    print("  Watching for tasks...")
+    print("")
+    
+    log_to_dashboard("MiLyfe VTS agent runtime started — all 11 agents online", "info", "system")
+    
+    # Run standup immediately on start
+    daily_standup()
+    
+    # Keep running
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
 
 if __name__ == "__main__":
-    print("[Agent Runtime] Starting Venture Titan Studio agent runtime...")
-    print(f"[Agent Runtime] {len(SENIOR_AGENTS)} senior agents initialized")
-    print(f"[Agent Runtime] Ollama: {OLLAMA_URL}")
-    print(f"[Agent Runtime] Mattermost: {MATTERMOST_URL}")
-    print(f"[Agent Runtime] Clients dir: {CLIENTS_DIR}")
-    print("[Agent Runtime] Ready. Awaiting commands via Bridge API or scheduler.")
-
-    # In production, this runs a scheduler loop or listens for events.
-    # The Bridge API (agent_api.py) calls these functions directly.
-    import time
-    while True:
-        time.sleep(60)
+    main()

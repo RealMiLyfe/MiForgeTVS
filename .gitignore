@@ -9,6 +9,7 @@ out/
 build/
 dist/
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Environment files
 .env
@@ -20,15 +21,18 @@ dist/
 .idea/
 *.swp
 *.swo
+*.sublime-*
 
 # OS
 .DS_Store
 Thumbs.db
+._*
 
-# Debug
+# Debug / Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # Vercel
 .vercel
@@ -40,10 +44,27 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.mypy_cache/
+.pytest_cache/
+
+# Aider (AI coding tool session files)
+.aider*
+.aider.tags.cache.v4/
+
+# Large binary files (use LFS or don't commit)
+*.zip
+*.tar.gz
+*.node
+*.wasm
+
+# Runtime secrets and data (never commit)
+/opt/milyfe/
+secrets/
+bridge-token.txt
 
 # Misc
 *.pem
 coverage/
 .yarn/install-state.gz
 next-env.d.ts
-.aider*
+nohup.out
