@@ -1,6 +1,0 @@
-{
-  "installCommand": "cd apps/miforge && npm install",
-  "buildCommand": "cd apps/miforge && npm run build",
-  "outputDirectory": "apps/miforge/.next",
-  "framework": "nextjs"
-}
