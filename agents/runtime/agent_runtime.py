@@ -45,10 +45,10 @@ TOKENS, CHANNELS = load_secrets()
 def get_client_for_file(file_path: str) -> str:
     """Infer client from path or filename, else default."""
     p = str(file_path).lower()
-    if "teresa" in p:
-        return "teresa-grooming"
-    if "ohio" in p:
-        return "ohio-landscaping"
+    if "demo" in p:
+        return "milyfe-demo"
+    if "campaign" in p:
+        return "milyfe-campaign"
     return "default"
 
 # ============================================================

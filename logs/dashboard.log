@@ -1,0 +1,36 @@
+
+> dev
+> next dev --port 7800
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:7800
+- Network:       http://10.0.0.100:7800
+- Environments: .env
+✓ Ready in 452ms
+
+ GET / 200 in 304ms (next.js: 145ms, application-code: 158ms)
+ GET / 200 in 41ms (next.js: 5ms, application-code: 36ms)
+ GET /api/agents 200 in 330ms (next.js: 179ms, application-code: 151ms)
+ GET /api/workflows 200 in 332ms (next.js: 206ms, application-code: 126ms)
+ GET /api/services 200 in 120ms (next.js: 36ms, application-code: 85ms)
+ GET /api/dashboard 200 in 150ms (next.js: 70ms, application-code: 80ms)
+ GET /api/phases 200 in 385ms (next.js: 137ms, application-code: 248ms)
+[?25h
+
+> dev
+> next dev --port 7800
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:7800
+- Network:       http://10.0.0.100:7800
+- Environments: .env
+✓ Ready in 422ms
+
+ GET / 200 in 301ms (next.js: 143ms, application-code: 158ms)
+ GET / 200 in 48ms (next.js: 5ms, application-code: 42ms)
+ GET /api/agents 200 in 378ms (next.js: 198ms, application-code: 180ms)
+ GET /api/workflows 200 in 393ms (next.js: 225ms, application-code: 168ms)
+ GET /api/services 200 in 397ms (next.js: 254ms, application-code: 143ms)
+ GET /api/dashboard 200 in 429ms (next.js: 308ms, application-code: 121ms)
+ GET /api/phases 200 in 440ms (next.js: 154ms, application-code: 286ms)
+[?25h

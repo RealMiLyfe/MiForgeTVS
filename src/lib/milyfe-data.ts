@@ -541,5 +541,5 @@ export const channelsData: ChannelData[] = [
   { name: "agent-standup", description: "Daily agent status updates", category: "Operations" },
   { name: "weekly-retrospective", description: "Weekly review and improvements", category: "Learning" },
   { name: "partner-reports", description: "Partner and client reports", category: "Reports" },
-  { name: "client-teresa", description: "Example client channel", category: "Clients" },
+  { name: "milyfe-demo", description: "Example client channel", category: "Clients" },
 ];
